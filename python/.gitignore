@@ -29,8 +29,8 @@ node_modules
 
 # Environment key file
 .env
-.env.*
-!.env.example
+.env
+!.env
 .secrets
 
 # OS X tmp
