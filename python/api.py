@@ -2,9 +2,7 @@ from dotenv import load_dotenv
 from flask import *
 from methods import *
 from convert import *
-import mysql.connector
-import configparser
-
+from Database import *
 
 app = Flask(__name__)
 load_dotenv()
@@ -15,6 +13,7 @@ login = Token()
 protected = Restricted()
 convert = CidrMaskConvert()
 validate = IpValidate()
+database = Database()
 
 
 # Just a health check
@@ -32,18 +31,11 @@ def urlHealth():
 # e.g. http://127.0.0.1:8000/login
 @app.route("/login", methods=['POST'])
 def urlLogin():
-    username = request.form('username')
-    password = request.form('password')
-    # This database data is here just for you to test, please, remember to define your own DB
-    # You can test with username = admin, password = secret  
-    # This DB has already a best practice: a salt value to store the passwords
+    username = request.form['username']
+    password = request.form['password']
 
-    db_config = config['database']
-    con = mysql.connector.connect(**db_config)
-    cursor = con.cursor()
-    cursor.execute("SELECT salt, password, role from users where username = %s;")
-    Query = cursor.fetchall()
-    token = login.generateToken(username, password, Query)
+    user_data = database.get_user_data(username)
+    token = login.generate_token(username, password, user_data)
 
     if token is not False:
         payload = {"data": token}
@@ -52,24 +44,34 @@ def urlLogin():
 
 
 # e.g. http://127.0.0.1:8000/cidr-to-mask?value=8
-@app.route("/cidr-to-mask")
+@app.route("/cidr-to-mask", methods=['POST'])
 def url_cidr_to_mask():
-    auth_header = request.headers.get('Authorization')
-    if not protected.access_Data(auth_header):
+
+    auth_header = os.getenv('TOKEN')
+    if not protected.access_data(auth_header):
         abort(401)
-    cidr_value = request.args.get('value')
-    response = {"function": "cidr_to_mask", "input": cidr_value, "output": convert.cidr_to_mask(cidr_value), }
+    cidr_value = int(request.form['cidr'])
+    response = {
+        "function": "cidr_to_mask",
+        "input": cidr_value,
+        "output": convert.cidr_to_mask(cidr_value)
+    }
     return jsonify(response)
 
 
 # # e.g. http://127.0.0.1:8000/mask-to-cidr?value=255.0.0.0
-@app.route("/mask-to-cidr")
+@app.route("/mask-to-cidr", methods=['POST'])
 def urlMaskToCidr():
-    auth_header = request.headers.get('Authorization')
-    if not protected.access_Data(auth_header):
+
+    auth_header = os.getenv('TOKEN')
+
+    if not protected.access_data(auth_header):
         abort(401)
-    cidr_value = request.args.get('value')
-    response = {"function": "maskToCidr", "input": cidr_value, "output": convert.mask_to_cidr(cidr_value), }
+    mask_value = request.form['value']
+
+    if not validate.ipv4_validation(mask_value):
+        abort(400)
+    response = {"function": "maskToCidr", "input": mask_value, "output": convert.mask_to_cidr(mask_value), }
     return jsonify(response)
 
 

@@ -1,27 +1,32 @@
 import hashlib
+import os
 import jwt
+
+
 class Token:
-    def generateToken(self, username, input_password, Query):  
-        usefulKey = 'my2w7wjd7yXF64FIADfJxNs1oupTGAuW'
-        if len(Query):
-            salt=Query[0][0]
-            password=Query[0][1]
-            role=Query[0][2]  
-            hashPass=hashlib.sha512((input_password+salt).encode()).hexdigest()
-            if hashPass==password:
-                enJWT = jwt.encode({"role": role}, usefulKey, algorithm='HS256')
-                return enJWT
-            else:
-                return False
-        else:
-            return False
+
+    def generate_token(self, username, input_password, query):
+        useful_key = 'my2w7wjd7yXF64FIADfJxNs1oupTGAuW'
+
+        if query:
+            salt, password, role = query
+            hashPass = hashlib.sha512((input_password + salt).encode()).hexdigest()
+            if hashPass == password:
+                token = jwt.encode({"role": role}, useful_key, algorithm='HS256')
+                os.environ['TOKEN'] = 'Bearer ' + token
+                return token
+        return False
+
+
 class Restricted:
-    def access_Data(self, authorization): 
+
+    def access_data(self, authorization):
         try:
-            var1=jwt.decode(authorization.replace('Bearer', '')[1:], 'my2w7wjd7yXF64FIADfJxNs1oupTGAuW', algorithms='HS256')
-        except Exception as e:
-            return False
-        if 'role' in var1:
-            return True  
-        else:
-            return False
+            token = jwt.decode(authorization.replace('Bearer', '')[1:],
+                               'my2w7wjd7yXF64FIADfJxNs1oupTGAuW',
+                               algorithms='HS256')
+            if 'role' in token:
+                return True
+        except jwt.InvalidTokenError:
+            pass
+        return False
